@@ -83,7 +83,7 @@ def fetch_records() -> list[dict]:
     avant la première mise en production, le schéma peut évoluer."""
     params = {
         "q": SEARCH_QUERY,
-        "limit": 100,
+        "limit": 1000000,
     }
     resp = requests.get(API_BASE, params=params, timeout=30)
     resp.raise_for_status()
