@@ -213,8 +213,8 @@
 <main>
   <div class="hero">
     <div class="eyebrow">▲ Source officielle — BOAMP / DILA / LinkedIn</div>
-    <h1>Tous les appels d'offres WMS Reflex, conseils et gestion de projet.</h1>
-    <p>Ce radar interroge en direct le Bulletin officiel des annonces des marchés publics et classe chaque avis selon sa pertinence pour le conseil et la gestion de projets en WMS REFLEX by Hardis.</p>
+    <h1>Tous les appels d'offres WMS REFLEX, conseils et gestion de projets.</h1>
+    <p>Ce radar interroge en direct le Bulletin officiel des annonces des marchés publics et LinkedIn pour le conseil et la gestion de projets.</p>
     <div class="scan-line"></div>
   </div>
 
@@ -248,12 +248,12 @@ const API_BASE = '/api/boamp';
 
 // Requête large : on part volontairement plus large que "Reflex" seul, car la
 // plupart des AO ne citent pas l'éditeur nommément. Le score fait le tri ensuite.
-const SEARCH_QUERY = '(WMS OR Reflex OR Hardis OR "gestion d\'entrepôt" OR "gestion d\'entrepôts" OR "système de gestion d\'entrepôt" OR "warehouse management")';
+const SEARCH_QUERY = '(WMS OR Reflex OR Hardis OR Consultant OR Gestion de projet OR "gestion d\'entrepôt" OR "gestion d\'entrepôts" OR "système de gestion d\'entrepôt" OR "warehouse management")';
 
 // Termes qui indiquent une correspondance forte (mention explicite de l'éditeur/produit)
-const HIGH_SIGNAL = ['reflex', 'hardis'];
+const HIGH_SIGNAL = ['REFLEX', 'Hardis'];
 // Termes de contexte WMS générique
-const MID_SIGNAL = ['wms', "gestion d'entrepôt", "gestion d'entrepôts", 'warehouse management', "système de gestion d'entrepôt"];
+const MID_SIGNAL = ['WMS', "Consultant", "gestion de projet", "gestion d'entrepôt", "gestion d'entrepôts", 'warehouse management', "système de gestion d'entrepôt"];
 // Termes logistiques adjacents, plus faibles seuls
 const LOW_SIGNAL = ['logistique', 'entrepôt', 'plateforme logistique', "système d'information logistique", 'sge'];
 
