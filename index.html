@@ -242,7 +242,9 @@
 </footer>
 
 <script>
-const API_BASE = 'https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records';
+// Appel via le proxy serverless (/api/boamp.js) plutôt que directement à l'API BOAMP,
+// pour contourner le blocage CORS observé depuis le navigateur.
+const API_BASE = '/api/boamp';
 
 // Requête large : on part volontairement plus large que "Reflex" seul, car la
 // plupart des AO ne citent pas l'éditeur nommément. Le score fait le tri ensuite.
@@ -295,9 +297,13 @@ async function loadData(){
   cardsEl.innerHTML = '';
 
   try {
-    const url = `${API_BASE}?where=${encodeURIComponent(SEARCH_QUERY)}&limit=50&order_by=dateparution desc`;
+    const url = `${API_BASE}?q=${encodeURIComponent(SEARCH_QUERY)}&limit=50`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) {
+      let detail = '';
+      try { detail = await res.text(); } catch (e) { /* ignore */ }
+      throw new Error(`HTTP ${res.status} — ${detail.slice(0, 300)}`);
+    }
     const data = await res.json();
     const results = data.results || data.records || [];
 
