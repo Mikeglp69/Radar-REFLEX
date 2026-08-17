@@ -80,3 +80,4 @@ couverts par une API unifiée — certains n'ont qu'un flux RSS, d'autres
 rien du tout. Si vous voulez les ajouter, la meilleure approche est de
 traiter chaque plateforme au cas par cas plutôt que de chercher un
 agrégateur universel. Je peux vous aider à en ajouter une à la fois.
+<!-- déploiement V01.0-->
