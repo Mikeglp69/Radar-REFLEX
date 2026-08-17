@@ -31,17 +31,21 @@ SEEN_IDS_FILE = Path(__file__).parent / "seen_ids.json"
 
 # Même logique de recherche et de score que le site, à garder synchronisée avec index.html.
 SEARCH_QUERY = (
-    '(WMS OR Reflex OR Hardis OR "gestion d\'entrepôt" OR "gestion d\'entrepôts" '
+    '(WMS OR REFLEX OR Hardis OR Consultant fonctionnel WMS REFLEX OR Chef de projet WMS REFLEX OR "gestion d\'entrepôt" OR "gestion d\'entrepôts" '
     'OR "système de gestion d\'entrepôt" OR "warehouse management")'
 )
 
 HIGH_SIGNAL = ["reflex", "hardis"]
 MID_SIGNAL = [
-    "wms",
+    "REFLEX",
+    "HARDIS",
+    "WMS",
     "gestion d'entrepôt",
     "gestion d'entrepôts",
     "warehouse management",
     "système de gestion d'entrepôt",
+    "Consultant",
+    "Chef de projet",
 ]
 LOW_SIGNAL = [
     "logistique",
