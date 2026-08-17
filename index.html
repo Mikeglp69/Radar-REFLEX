@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar Reflex — Veille appels d'offres WMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1420;
+    --surface:#161D2C;
+    --surface-raised:#1C2436;
+    --border:#28324A;
+    --text:#E9ECF1;
+    --text-dim:#8B94A8;
+    --text-faint:#5B6478;
+    --accent:#FF8A42;
+    --accent-dim:#8A4F27;
+    --signal:#4ADE80;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{
+    font-family:'Space Grotesk',sans-serif;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- top bar ---------- */
+  header{
+    position:sticky; top:0; z-index:20;
+    background:rgba(14,20,32,0.92);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+  }
+  .header-inner{
+    max-width:1180px; margin:0 auto; padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand-mark{
+    width:34px; height:34px; border-radius:8px;
+    background:linear-gradient(155deg,var(--accent),#C9581C);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; color:#0E1420;
+    flex-shrink:0;
+  }
+  .brand-text{display:flex; flex-direction:column; line-height:1.15;}
+  .brand-text strong{font-size:16px; font-weight:600;}
+  .brand-text span{font-size:11.5px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;}
+
+  .status{
+    display:flex; align-items:center; gap:8px;
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim);
+    padding:7px 12px; border:1px solid var(--border); border-radius:999px;
+  }
+  .status-dot{
+    width:7px; height:7px; border-radius:50%; background:var(--signal);
+    box-shadow:0 0 0 0 rgba(74,222,128,0.6);
+    animation:pulse 2.2s infinite;
+  }
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(74,222,128,0.55);}
+    70%{box-shadow:0 0 0 8px rgba(74,222,128,0);}
+    100%{box-shadow:0 0 0 0 rgba(74,222,128,0);}
+  }
+
+  /* ---------- layout ---------- */
+  main{max-width:1180px; margin:0 auto; padding:36px 24px 80px;}
+  .hero{margin-bottom:32px;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--accent);
+    text-transform:uppercase; letter-spacing:0.08em; margin-bottom:10px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .hero h1{font-size:clamp(26px,4vw,36px); font-weight:600; margin:0 0 10px; max-width:640px;}
+  .hero p{color:var(--text-dim); font-size:15px; max-width:560px; line-height:1.6; margin:0;}
+
+  .scan-line{
+    position:relative; height:2px; background:var(--border); margin:28px 0 0; overflow:hidden; border-radius:2px;
+  }
+  .scan-line::after{
+    content:''; position:absolute; top:0; left:-30%; width:30%; height:100%;
+    background:linear-gradient(90deg,transparent,var(--accent),transparent);
+    animation:scan 3.2s ease-in-out infinite;
+  }
+  @keyframes scan{
+    0%{left:-30%;} 50%{left:100%;} 100%{left:100%;}
+  }
+
+  /* ---------- controls ---------- */
+  .controls{
+    display:flex; flex-wrap:wrap; gap:10px; margin:28px 0 22px; align-items:center;
+  }
+  .search-box{
+    flex:1 1 260px; display:flex; align-items:center; gap:10px;
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:11px 14px;
+  }
+  .search-box input{
+    background:none; border:none; outline:none; color:var(--text); font-size:14px; width:100%;
+    font-family:'Inter',sans-serif;
+  }
+  .search-box input::placeholder{color:var(--text-faint);}
+  .search-box svg{flex-shrink:0; color:var(--text-faint);}
+
+  select, .btn{
+    background:var(--surface); border:1px solid var(--border); color:var(--text);
+    border-radius:var(--radius); padding:11px 14px; font-size:13px; font-family:'Inter',sans-serif;
+    cursor:pointer;
+  }
+  .btn-primary{
+    background:var(--accent); color:#1A0E05; border:1px solid var(--accent); font-weight:600;
+  }
+  .btn-primary:hover{background:#FF9C5C;}
+  select:focus, .search-box:focus-within{border-color:var(--accent-dim);}
+
+  /* ---------- stats strip ---------- */
+  .stats{display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap;}
+  .stat{
+    flex:1 1 140px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 16px;
+  }
+  .stat .num{font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:600;}
+  .stat .lbl{font-size:11.5px; color:var(--text-dim); margin-top:2px;}
+
+  /* ---------- results ---------- */
+  #status-msg{color:var(--text-dim); font-size:13px; margin:8px 0 20px; font-family:'IBM Plex Mono',monospace;}
+  .cards{display:flex; flex-direction:column; gap:12px;}
+
+  .card{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:20px; display:grid; grid-template-columns:1fr auto; gap:16px; align-items:start;
+    transition:border-color .15s;
+  }
+  .card:hover{border-color:#3A4664;}
+  .card-title{font-size:15.5px; font-weight:600; line-height:1.4; margin:0 0 8px; color:var(--text);}
+  .card-meta{
+    display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--text-dim);
+    font-family:'IBM Plex Mono',monospace; margin-bottom:10px;
+  }
+  .card-meta span{display:flex; align-items:center; gap:5px;}
+  .card-excerpt{font-size:13px; color:var(--text-dim); line-height:1.6; margin:0;}
+  .card-link{
+    display:inline-flex; align-items:center; gap:6px; margin-top:12px; font-size:12.5px;
+    color:var(--accent); text-decoration:none; font-weight:500;
+  }
+  .card-link:hover{text-decoration:underline;}
+
+  .gauge-wrap{display:flex; flex-direction:column; align-items:center; gap:6px; min-width:90px;}
+  .gauge{display:flex; flex-direction:column-reverse; gap:3px;}
+  .gauge i{
+    display:block; width:34px; height:7px; border-radius:2px; background:var(--border);
+  }
+  .gauge i.lit{background:var(--accent);}
+  .gauge-label{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--text-faint); text-align:center;}
+
+  .tag{
+    display:inline-block; font-size:10.5px; font-family:'IBM Plex Mono',monospace;
+    padding:3px 8px; border-radius:5px; border:1px solid;
+  }
+  .tag-high{color:var(--signal); border-color:#245C3E; background:rgba(74,222,128,0.08);}
+  .tag-mid{color:var(--accent); border-color:var(--accent-dim); background:rgba(255,138,66,0.08);}
+  .tag-low{color:var(--text-dim); border-color:var(--border); background:transparent;}
+
+  .empty{
+    text-align:center; padding:60px 20px; color:var(--text-dim); border:1px dashed var(--border);
+    border-radius:var(--radius);
+  }
+  .empty strong{display:block; color:var(--text); font-size:15px; margin-bottom:6px; font-family:'Space Grotesk',sans-serif;}
+
+  footer{
+    border-top:1px solid var(--border); margin-top:40px; padding:24px; text-align:center;
+    color:var(--text-faint); font-size:12px; font-family:'IBM Plex Mono',monospace;
+  }
+
+  @media(max-width:640px){
+    .card{grid-template-columns:1fr;}
+    .gauge-wrap{flex-direction:row; justify-content:flex-start;}
+    .gauge{flex-direction:row;}
+    .gauge i{width:7px; height:20px;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .status-dot, .scan-line::after{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-mark">R</div>
+      <div class="brand-text">
+        <strong>Radar Reflex</strong>
+        <span>Veille marchés publics WMS</span>
+      </div>
+    </div>
+    <div class="status"><span class="status-dot"></span><span>Scan BOAMP en direct</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="eyebrow">▲ Source officielle — BOAMP / DILA</div>
+    <h1>Tous les appels d'offres publics touchant au WMS et à Reflex, au même endroit.</h1>
+    <p>Ce radar interroge en direct le Bulletin officiel des annonces des marchés publics et classe chaque avis selon sa pertinence pour le conseil en WMS spécialisé Reflex (éditeur Hardis).</p>
+    <div class="scan-line"></div>
+  </div>
+
+  <div class="controls">
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="search" type="text" placeholder="Filtrer par mot-clé, acheteur, département…">
+    </div>
+    <select id="relevance-filter">
+      <option value="0">Toute pertinence</option>
+      <option value="3">Pertinence moyenne+</option>
+      <option value="4">Pertinence forte uniquement</option>
+    </select>
+    <button class="btn btn-primary" id="refresh-btn">↻ Relancer le scan</button>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div id="status-msg">Initialisation du scan…</div>
+  <div class="cards" id="cards"></div>
+</main>
+
+<footer>
+  Données : BOAMP (DILA) — Licence Ouverte 2.0 · Score de pertinence calculé côté client, à vérifier avant candidature.
+</footer>
+
+<script>
+const API_BASE = 'https://boamp-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/boamp/records';
+
+// Requête large : on part volontairement plus large que "Reflex" seul, car la
+// plupart des AO ne citent pas l'éditeur nommément. Le score fait le tri ensuite.
+const SEARCH_QUERY = '(WMS OR Reflex OR Hardis OR "gestion d\'entrepôt" OR "gestion d\'entrepôts" OR "système de gestion d\'entrepôt" OR "warehouse management")';
+
+// Termes qui indiquent une correspondance forte (mention explicite de l'éditeur/produit)
+const HIGH_SIGNAL = ['reflex', 'hardis'];
+// Termes de contexte WMS générique
+const MID_SIGNAL = ['wms', "gestion d'entrepôt", "gestion d'entrepôts", 'warehouse management', "système de gestion d'entrepôt"];
+// Termes logistiques adjacents, plus faibles seuls
+const LOW_SIGNAL = ['logistique', 'entrepôt', 'plateforme logistique', "système d'information logistique", 'sge'];
+
+let allRecords = [];
+
+function scoreRecord(text){
+  const t = text.toLowerCase();
+  let score = 0;
+  if (HIGH_SIGNAL.some(k => t.includes(k))) score = 5;
+  else if (MID_SIGNAL.filter(k => t.includes(k)).length >= 2) score = 4;
+  else if (MID_SIGNAL.some(k => t.includes(k))) score = 3;
+  else if (LOW_SIGNAL.filter(k => t.includes(k)).length >= 2) score = 2;
+  else if (LOW_SIGNAL.some(k => t.includes(k))) score = 1;
+  return score;
+}
+
+function tagFor(score){
+  if (score >= 4) return {cls:'tag-high', label:'Correspondance forte'};
+  if (score >= 3) return {cls:'tag-mid', label:'Correspondance moyenne'};
+  return {cls:'tag-low', label:'Correspondance faible'};
+}
+
+function gaugeHTML(score){
+  let bars = '';
+  for (let i=1;i<=5;i++) bars += `<i class="${i<=score?'lit':''}"></i>`;
+  return `<div class="gauge-wrap"><div class="gauge">${bars}</div><div class="gauge-label">${score}/5</div></div>`;
+}
+
+function fieldGuess(rec, candidates, fallback){
+  const f = rec.record ? rec.record.fields : rec.fields || rec;
+  for (const c of candidates){
+    if (f && f[c]) return f[c];
+  }
+  return fallback;
+}
+
+async function loadData(){
+  const statusMsg = document.getElementById('status-msg');
+  const cardsEl = document.getElementById('cards');
+  statusMsg.textContent = 'Interrogation de l\'API BOAMP…';
+  cardsEl.innerHTML = '';
+
+  try {
+    const url = `${API_BASE}?where=${encodeURIComponent(SEARCH_QUERY)}&limit=50&order_by=dateparution desc`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const results = data.results || data.records || [];
+
+    allRecords = results.map(r => {
+      const f = r.record ? r.record.fields : r;
+      const objet = fieldGuess(r, ['objet','object','titre'], 'Objet du marché non renseigné');
+      const acheteur = fieldGuess(r, ['nomacheteur','nom_acheteur','acheteur'], 'Acheteur non précisé');
+      const dept = fieldGuess(r, ['code_departement','departement'], '');
+      const dateParution = fieldGuess(r, ['dateparution','date_parution'], '');
+      const url_avis = fieldGuess(r, ['url_avis','url'], '#');
+      const fullText = [objet, fieldGuess(r,['descripteur_libelle',''],''), acheteur].join(' ');
+      const score = scoreRecord(fullText);
+      return {objet, acheteur, dept, dateParution, url_avis, score};
+    }).filter(r => r.score > 0)
+      .sort((a,b) => b.score - a.score);
+
+    statusMsg.textContent = allRecords.length
+      ? `${allRecords.length} avis pertinents trouvés — dernière mise à jour ${new Date().toLocaleTimeString('fr-FR')}`
+      : 'Aucun avis correspondant actuellement en ligne.';
+
+    render();
+  } catch (err){
+    statusMsg.textContent = '';
+    cardsEl.innerHTML = `<div class="empty">
+      <strong>Connexion à l'API BOAMP impossible depuis ce navigateur</strong>
+      Cause probable : restriction CORS ou réseau. Le script Python fourni (boamp_scan.py) interroge la
+      même API côté serveur et n'est pas soumis à cette limite — c'est lui qui doit alimenter les alertes email.
+      <br><br><span class="mono" style="font-size:11px;color:var(--text-faint)">${err.message}</span>
+    </div>`;
+    updateStats([]);
+  }
+}
+
+function updateStats(records){
+  const strong = records.filter(r=>r.score>=4).length;
+  const mid = records.filter(r=>r.score===3).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${records.length}</div><div class="lbl">Avis suivis</div></div>
+    <div class="stat"><div class="num">${strong}</div><div class="lbl">Correspondance forte</div></div>
+    <div class="stat"><div class="num">${mid}</div><div class="lbl">Correspondance moyenne</div></div>
+  `;
+}
+
+function render(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const minScore = parseInt(document.getElementById('relevance-filter').value, 10);
+  const filtered = allRecords.filter(r =>
+    r.score >= minScore &&
+    (r.objet.toLowerCase().includes(q) || r.acheteur.toLowerCase().includes(q) || (r.dept||'').includes(q))
+  );
+  updateStats(filtered);
+
+  const cardsEl = document.getElementById('cards');
+  if (!filtered.length){
+    cardsEl.innerHTML = `<div class="empty"><strong>Rien à afficher</strong>Ajustez les filtres ou relancez le scan.</div>`;
+    return;
+  }
+  cardsEl.innerHTML = filtered.map(r => {
+    const tag = tagFor(r.score);
+    return `<div class="card">
+      <div>
+        <span class="tag ${tag.cls}" style="margin-bottom:8px;display:inline-block;">${tag.label}</span>
+        <p class="card-title">${escapeHtml(r.objet)}</p>
+        <div class="card-meta">
+          <span>🏛 ${escapeHtml(r.acheteur)}</span>
+          ${r.dept ? `<span>📍 Dépt. ${escapeHtml(r.dept)}</span>` : ''}
+          ${r.dateParution ? `<span>🗓 ${escapeHtml(r.dateParution)}</span>` : ''}
+        </div>
+        <a class="card-link" href="${r.url_avis}" target="_blank" rel="noopener">Voir l'avis complet →</a>
+      </div>
+      ${gaugeHTML(r.score)}
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+document.getElementById('search').addEventListener('input', render);
+document.getElementById('relevance-filter').addEventListener('change', render);
+document.getElementById('refresh-btn').addEventListener('click', loadData);
+
+loadData();
+</script>
+</body>
+</html>
