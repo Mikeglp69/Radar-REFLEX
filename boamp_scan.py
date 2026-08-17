@@ -78,9 +78,8 @@ def fetch_records() -> list[dict]:
     https://boamp-datadila.opendatasoft.com/explore/dataset/boamp/information/
     avant la première mise en production, le schéma peut évoluer."""
     params = {
-        "where": SEARCH_QUERY,
+        "q": SEARCH_QUERY,
         "limit": 100,
-        "order_by": "dateparution desc",
     }
     resp = requests.get(API_BASE, params=params, timeout=30)
     resp.raise_for_status()
