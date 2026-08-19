@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 """
-boamp_scan.py — Veille des appels d'offres WMS / Reflex
-                 sur BOAMP + LinkedIn
+boamp_scan.py — Veille Hardis WMS (ex Reflex)
+                 sur BOAMP + marché emploi/freelance
 
 Sources :
     - BOAMP : API officielle DILA (marchés publics)
-    - LinkedIn : résultats publics indexés via moteur de recherche (Serper)
+    - LinkedIn / Indeed / Mindquest / Hardis : résultats publics indexés via moteur de recherche (Serper)
+
+NOTE MARCHÉ :
+    Hardis a rebaptisé son produit « Hardis WMS (ex Reflex) ». Les besoins
+    publics autour de Reflex/WMS apparaissent surtout sous forme de missions
+    freelance ou d'offres d'emploi (Mindquest, Indeed, Hardis, LinkedIn), et
+    beaucoup moins sous forme d'appels d'offres BOAMP. Par conséquent, un
+    « 0 résultat BOAMP » sur 7 jours est considéré comme un résultat normal
+    et non comme une anomalie à signaler.
 
 Variables d'environnement :
 
@@ -22,6 +30,10 @@ Variables d'environnement :
                                Si absent, la recherche LinkedIn est ignorée.
 
     LINKEDIN_RESULTS_LIMIT     (défaut 20)
+
+    MARKET_RESULTS_LIMIT       (défaut 20)
+                               Nombre max de résultats par requête marché
+                               emploi/freelance (Serper).
 
     BOAMP_LOOKBACK_DAYS        (défaut 7)
                                Ne remonte que les avis publiés dans les
@@ -76,6 +88,7 @@ SEEN_IDS_FILE = Path(__file__).parent / "seen_ids.json"
 MIN_SCORE_FOR_ALERT = int(os.environ.get("MIN_SCORE_FOR_ALERT", "3"))
 
 LINKEDIN_RESULTS_LIMIT = int(os.environ.get("LINKEDIN_RESULTS_LIMIT", "20"))
+MARKET_RESULTS_LIMIT = int(os.environ.get("MARKET_RESULTS_LIMIT", "20"))
 
 BOAMP_LOOKBACK_DAYS = int(os.environ.get("BOAMP_LOOKBACK_DAYS", "7"))
 
@@ -91,25 +104,24 @@ BOAMP_MAX_PAGES = 20  # garde-fou : 2000 avis max par run
 # ============================================================================
 
 SEARCH_QUERY = (
-    '(Hardis WMS OR Reflex/WMS OR Hardis '
-    'OR "Consultant fonctionnel Hardis WMS OR Reflex/WMS" '
-    'OR "Chef de projet Reflex/WMS" '
-    'OR "gestion d\'entrepôt" '
-    'OR "gestion d\'entrepôts" '
-    'OR "système de gestion d\'entrepôt" '
-    'OR "warehouse management")'
+    '("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR '
+    '"logiciel Reflex" OR "solution Reflex" OR '
+    '"gestion d\'entrepôt" OR "gestion d\'entrepôts" OR '
+    '"système de gestion d\'entrepôt" OR "warehouse management")'
 )
 
 # Recherche LinkedIn volontairement plus ciblée.
 LINKEDIN_SEARCH_QUERIES = [
-    'site:linkedin.com/jobs/view '
-    '(Hardis WMS OR Reflex/WMS OR Hardis OR "warehouse management")',
+    'site:linkedin.com/jobs/view ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
+    'site:linkedin.com/posts ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
+    'site:linkedin.com/feed/update ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
+]
 
-    'site:linkedin.com/posts '
-    '(Hardis WMS OR Reflex/WMS OR Hardis OR "gestion d\'entrepôt")',
-
-    'site:linkedin.com/feed/update '
-    '(Hardis WMS OR Reflex/WMS OR Hardis OR "gestion d\'entrepôt")',
+# Les besoins Reflex/WMS passent fréquemment par l'emploi et le freelance.
+MARKET_SEARCH_QUERIES = [
+    'site:mindquest.io ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
+    'site:indeed.com ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
+    'site:hardis-group.com ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Reflex)',
 ]
 
 
@@ -120,9 +132,15 @@ LINKEDIN_SEARCH_QUERIES = [
 # Signaux "mots courts" : on impose des frontières de mot (\b) pour éviter
 # les faux positifs par sous-chaîne (ex: "WMS" ne doit pas matcher à
 # l'intérieur d'un autre mot).
-HIGH_SIGNAL_WORDS = ["Reflex/WMS", "Hardis WMS"]
+HIGH_SIGNAL_WORDS = [
+    "reflex/wms",
+    "hardis wms",
+    "reflex wms",
+    "logiciel reflex",
+    "solution reflex",
+]
 
-MID_SIGNAL_WORDS = ["wms"]
+MID_SIGNAL_WORDS = ["wms", "reflex"]
 MID_SIGNAL_PHRASES = [
     "gestion d'entrepôt",
     "gestion d'entrepôts",
@@ -376,6 +394,62 @@ def fetch_linkedin_results() -> list[dict]:
     return results
 
 
+def fetch_market_results() -> list[dict]:
+    """Recherche emploi/freelance sur Mindquest, Indeed et Hardis via Serper."""
+    api_key = os.environ.get("SERPER_API_KEY")
+    if not api_key:
+        print("→ SERPER_API_KEY absente : recherche emploi/freelance ignorée.")
+        return []
+
+    headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
+    results = []
+
+    for query in MARKET_SEARCH_QUERIES:
+        payload = {"q": query, "num": MARKET_RESULTS_LIMIT, "gl": "fr", "hl": "fr"}
+        try:
+            resp = requests.post(SERPER_API_URL, headers=headers, json=payload, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.RequestException as exc:
+            print(f"✗ Erreur recherche marché emploi/freelance : {exc}", file=sys.stderr)
+            continue
+
+        organic = data.get("organic", [])
+        print(f"  · requête marché « {query} » → {len(organic)} résultat(s) bruts Serper")
+
+        for item in organic:
+            url = item.get("link", "")
+            hostname = urlparse(url).netloc.lower()
+            if not any(domain in hostname for domain in ("mindquest.io", "indeed.com", "hardis-group.com")):
+                continue
+            results.append({
+                "title": item.get("title", "Résultat marché emploi/freelance"),
+                "snippet": item.get("snippet", ""),
+                "url": url,
+            })
+        time.sleep(0.5)
+
+    return results
+
+
+def parse_market_record(raw: dict) -> dict:
+    """Transforme un résultat emploi/freelance en format commun."""
+    title = raw.get("title", "Résultat marché emploi/freelance")
+    snippet = raw.get("snippet", "")
+    url = raw.get("url", "")
+    return {
+        "id": f"market:{url}",
+        "source": "Emploi/freelance",
+        "objet": title,
+        "acheteur": "",
+        "dept": "",
+        "date_parution": "",
+        "url_avis": url,
+        "score": score_text(" ".join([title, snippet])),
+        "description": snippet,
+    }
+
+
 def parse_linkedin_record(raw: dict) -> dict:
     """
     Transforme un résultat LinkedIn en format commun.
@@ -448,9 +522,11 @@ def build_email_body(new_matches: list[dict]) -> str:
     )
 
     lines = [
-        f"Radar Reflex — {len(new_matches)} nouvel(aux) résultat(s) détecté(s)",
+        f"Radar Hardis WMS (ex Reflex) — {len(new_matches)} nouvel(aux) résultat(s) détecté(s)",
         f"Généré le {generated_at}",
         "",
+        "Contexte marché : Hardis WMS (ex Reflex) est principalement visible dans les besoins emploi/freelance. Un 0 résultat BOAMP sur 7 jours est donc normal et ne constitue pas, à lui seul, un bug.",
+        
     ]
 
     sorted_matches = sorted(
@@ -472,7 +548,7 @@ def build_email_body(new_matches: list[dict]) -> str:
             if match["date_parution"]:
                 lines.append(f"  Publié le : {match['date_parution']}")
 
-        elif match["source"] == "LinkedIn":
+        elif match["source"] in ("LinkedIn", "Emploi/freelance"):
             if match.get("description"):
                 lines.append(f"  {match['description']}")
 
@@ -531,7 +607,17 @@ def main() -> int:
     linkedin_records = [parse_linkedin_record(r) for r in linkedin_raw]
     print(f"→ {len(linkedin_records)} résultats LinkedIn récupérés.")
 
-    all_records = deduplicate_records(boamp_records + linkedin_records)
+    print("→ Recherche emploi/freelance (Mindquest / Indeed / Hardis)…")
+    market_raw = fetch_market_results()
+    market_records = [parse_market_record(r) for r in market_raw]
+    print(f"→ {len(market_records)} résultats emploi/freelance récupérés.")
+
+    if not boamp_records:
+        print("ℹ 0 résultat BOAMP : situation possible et normale sur ce marché ; les besoins sont surtout suivis côté emploi/freelance.")
+
+    all_records = deduplicate_records(
+        boamp_records + linkedin_records + market_records
+    )
 
     relevant = [r for r in all_records if r["score"] >= MIN_SCORE_FOR_ALERT]
 
@@ -551,7 +637,7 @@ def main() -> int:
     print(f"→ {len(new_matches)} nouvel(aux) résultat(s). Envoi de l'email…")
 
     subject = (
-        f"[Radar Reflex] {len(new_matches)} nouvel(aux) résultat(s) BOAMP / LinkedIn"
+        f"[Radar Hardis WMS] {len(new_matches)} nouvel(aux) résultat(s) BOAMP / emploi-freelance / LinkedIn"
     )
     body = build_email_body(new_matches)
 
