@@ -91,9 +91,9 @@ BOAMP_MAX_PAGES = 20  # garde-fou : 2000 avis max par run
 # ============================================================================
 
 SEARCH_QUERY = (
-    '(WMS OR REFLEX OR Hardis '
-    'OR "Consultant fonctionnel WMS REFLEX" '
-    'OR "Chef de projet WMS REFLEX" '
+    '(Hardis WMS OR Reflex/WMS OR Hardis '
+    'OR "Consultant fonctionnel Hardis WMS OR Reflex/WMS" '
+    'OR "Chef de projet Reflex/WMS" '
     'OR "gestion d\'entrepôt" '
     'OR "gestion d\'entrepôts" '
     'OR "système de gestion d\'entrepôt" '
@@ -103,13 +103,13 @@ SEARCH_QUERY = (
 # Recherche LinkedIn volontairement plus ciblée.
 LINKEDIN_SEARCH_QUERIES = [
     'site:linkedin.com/jobs/view '
-    '(WMS OR REFLEX OR Hardis OR "warehouse management")',
+    '(Hardis WMS OR Reflex/WMS OR Hardis OR "warehouse management")',
 
     'site:linkedin.com/posts '
-    '(WMS OR REFLEX OR Hardis OR "gestion d\'entrepôt")',
+    '(Hardis WMS OR Reflex/WMS OR Hardis OR "gestion d\'entrepôt")',
 
     'site:linkedin.com/feed/update '
-    '(WMS OR REFLEX OR Hardis OR "gestion d\'entrepôt")',
+    '(Hardis WMS OR Reflex/WMS OR Hardis OR "gestion d\'entrepôt")',
 ]
 
 
@@ -120,7 +120,7 @@ LINKEDIN_SEARCH_QUERIES = [
 # Signaux "mots courts" : on impose des frontières de mot (\b) pour éviter
 # les faux positifs par sous-chaîne (ex: "WMS" ne doit pas matcher à
 # l'intérieur d'un autre mot).
-HIGH_SIGNAL_WORDS = ["reflex", "hardis"]
+HIGH_SIGNAL_WORDS = ["Reflex/WMS", "Hardis WMS"]
 
 MID_SIGNAL_WORDS = ["wms"]
 MID_SIGNAL_PHRASES = [
