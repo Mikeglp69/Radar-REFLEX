@@ -119,9 +119,19 @@ LINKEDIN_SEARCH_QUERIES = [
 
 # Les besoins Reflex/WMS passent fréquemment par l'emploi et le freelance.
 MARKET_SEARCH_QUERIES = [
-    'site:mindquest.io ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
-    'site:indeed.com ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Hardis)',
-    'site:hardis-group.com ("Hardis WMS" OR "Reflex WMS" OR "Reflex/WMS" OR Reflex)',
+    '"Reflex WMS" France freelance',
+    '"Consultant Reflex WMS" France',
+    '"Expert Reflex WMS" France',
+    '"Hardis WMS" France emploi',
+    '"Hardis WMS" France freelance',
+    '"Consultant WMS" "Hardis" France',
+    'site:free-work.com "Reflex WMS"',
+    'site:freelance-informatique.fr "Reflex WMS"',
+    'site:collective.work "Reflex WMS"',
+    'site:katchme.fr "Reflex WMS"',
+    'site:indeed.com/viewjob "Reflex WMS"',
+    'site:hardis-group.com/job-offers "Consultant WMS"',
+    'site:hardis-supplychain.com "Hardis WMS"',
 ]
 
 
@@ -133,11 +143,14 @@ MARKET_SEARCH_QUERIES = [
 # les faux positifs par sous-chaîne (ex: "WMS" ne doit pas matcher à
 # l'intérieur d'un autre mot).
 HIGH_SIGNAL_WORDS = [
-    "reflex/wms",
+    "reflex wms",
     "hardis wms",
     "reflex wms",
     "logiciel reflex",
     "solution reflex",
+    "consultant reflex",
+    "expert reflex",
+    "chef de projet reflex",
 ]
 
 MID_SIGNAL_WORDS = ["wms", "reflex"]
@@ -163,10 +176,9 @@ def _word_hit(word: str, text_lower: str) -> bool:
 
 
 def score_text(text: str) -> int:
-    """
-    Calcule un score de pertinence de 0 à 5.
-    """
-    t = (text or "").lower()
+    """Calcule un score de pertinence de 0 à 5."""
+    t = re.sub(r"[\u2013\u2014_/]+", " ", (text or "").lower())
+    t = re.sub(r"\s+", " ", t).strip()
 
     # Signal très fort (Reflex / Hardis explicitement cités)
     if any(_word_hit(w, t) for w in HIGH_SIGNAL_WORDS):
@@ -395,10 +407,15 @@ def fetch_linkedin_results() -> list[dict]:
 
 
 def fetch_market_results() -> list[dict]:
-    """Recherche emploi/freelance sur Mindquest, Indeed et Hardis via Serper."""
+    """Recherche large emploi/freelance via Serper.
+
+    On ne limite PAS la collecte à trois domaines : les offres Reflex/WMS
+    sont souvent syndiquées ou publiées sur des plateformes comme Free-Work,
+    Collective.work, Freelance-Informatique, KatchMe, Indeed, etc.
+    """
     api_key = os.environ.get("SERPER_API_KEY")
     if not api_key:
-        print("→ SERPER_API_KEY absente : recherche emploi/freelance ignorée.")
+        print("✗ SERPER_API_KEY absente : impossible d'interroger le marché emploi/freelance.")
         return []
 
     headers = {"X-API-KEY": api_key, "Content-Type": "application/json"}
@@ -411,26 +428,24 @@ def fetch_market_results() -> list[dict]:
             resp.raise_for_status()
             data = resp.json()
         except requests.RequestException as exc:
-            print(f"✗ Erreur recherche marché emploi/freelance : {exc}", file=sys.stderr)
+            print(f"✗ Erreur recherche marché « {query} » : {exc}", file=sys.stderr)
             continue
 
         organic = data.get("organic", [])
-        print(f"  · requête marché « {query} » → {len(organic)} résultat(s) bruts Serper")
+        print(f"  · marché « {query} » → {len(organic)} résultat(s) Serper")
 
         for item in organic:
             url = item.get("link", "")
-            hostname = urlparse(url).netloc.lower()
-            if not any(domain in hostname for domain in ("mindquest.io", "indeed.com", "hardis-group.com")):
+            if not url:
                 continue
             results.append({
                 "title": item.get("title", "Résultat marché emploi/freelance"),
                 "snippet": item.get("snippet", ""),
                 "url": url,
             })
-        time.sleep(0.5)
+        time.sleep(0.4)
 
     return results
-
 
 def parse_market_record(raw: dict) -> dict:
     """Transforme un résultat emploi/freelance en format commun."""
