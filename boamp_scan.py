@@ -202,8 +202,19 @@ def fetch_boamp_records() -> list[dict]:
         }
 
         resp = requests.get(API_BASE, params=params, timeout=30)
+
+        if page == 0:
+            # Diagnostic systématique (pas besoin de BOAMP_DEBUG pour ça) :
+            # on affiche toujours l'URL exacte interrogée et le nombre total
+            # de résultats annoncés par l'API, pour distinguer "l'API ne
+            # trouve rien" de "le filtrage local supprime tout".
+            print(f"→ Requête BOAMP : {resp.url}")
+
         resp.raise_for_status()
         data = resp.json()
+
+        if page == 0:
+            print(f"→ total_count annoncé par l'API : {data.get('total_count')}")
 
         results = data.get("results", [])
 
@@ -211,6 +222,14 @@ def fetch_boamp_records() -> list[dict]:
             print("=== BOAMP_DEBUG : premier enregistrement brut ===")
             print(json.dumps(results[0], ensure_ascii=False, indent=2))
             print("=== fin BOAMP_DEBUG ===")
+
+        if page == 0 and not results:
+            print(
+                "⚠ 0 résultat renvoyé par l'API pour cette requête/filtre. "
+                "Vérifie l'URL affichée ci-dessus (teste-la telle quelle dans "
+                "un navigateur ou avec curl) pour voir si le problème vient "
+                "du paramètre 'q' (ODSQL) ou du 'where' (champ dateparution)."
+            )
 
         all_results.extend(results)
 
@@ -333,7 +352,10 @@ def fetch_linkedin_results() -> list[dict]:
             print(f"✗ Erreur recherche LinkedIn : {exc}", file=sys.stderr)
             continue
 
-        for item in data.get("organic", []):
+        organic = data.get("organic", [])
+        print(f"  · requête « {query} » → {len(organic)} résultat(s) bruts Serper")
+
+        for item in organic:
             url = item.get("link", "")
             hostname = urlparse(url).netloc.lower()
 
